@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -342,12 +343,12 @@ func (b *Bundle) translatedLanguage(src string) *language.Language {
 
 func (b *Bundle) translate(lang *language.Language, translationID string, args ...interface{}) string {
 	if lang == nil {
-		return translationID
+		return fallback(translationID, args)
 	}
 
 	translation := b.translation(lang, translationID)
 	if translation == nil {
-		return translationID
+		return fallback(translationID, args)
 	}
 
 	var data interface{}
@@ -381,14 +382,27 @@ func (b *Bundle) translate(lang *language.Language, translationID string, args .
 	p, _ := lang.Plural(count)
 	template := translation.Template(p)
 	if template == nil {
-		return translationID
+		return fallback(translationID, args)
 	}
 
 	s := template.Execute(data)
 	if s == "" {
-		return translationID
+		return fallback(translationID, args)
 	}
 	return s
+}
+
+func fallback(translationID string, args []interface{}) string {
+	if len(args) != 1 {
+		return translationID
+	}
+	if templ, err := template.New("").Parse(translationID); err == nil {
+		var buf bytes.Buffer
+		if err = templ.Execute(&buf, args[0]); err == nil {
+			return buf.String()
+		}
+	}
+	return translationID
 }
 
 func (b *Bundle) translation(lang *language.Language, translationID string) translation.Translation {
