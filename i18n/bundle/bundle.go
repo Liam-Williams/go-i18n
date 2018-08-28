@@ -392,13 +392,22 @@ func (b *Bundle) translate(lang *language.Language, translationID string, args .
 	return s
 }
 
+var templateCache sync.Map
+
 func fallback(translationID string, args []interface{}) string {
 	if len(args) != 1 {
 		return translationID
 	}
-	if templ, err := template.New("").Parse(translationID); err == nil {
+	var templ *template.Template
+	if cached, ok := templateCache.Load(translationID); ok {
+		templ = cached.(*template.Template)
+	} else if parsed, err := template.New("").Parse(translationID); err == nil {
+		templ = parsed
+		templateCache.Store(translationID, parsed)
+	}
+	if templ != nil {
 		var buf bytes.Buffer
-		if err = templ.Execute(&buf, args[0]); err == nil {
+		if err := templ.Execute(&buf, args[0]); err == nil {
 			return buf.String()
 		}
 	}
